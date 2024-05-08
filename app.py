@@ -33,8 +33,8 @@ class ShotgunPanelApp(Application):
         # We won't be able to do anything if there's no UI. The import
         # of our app module below required some Qt components, and will likely
         # blow up.
-        if not self.engine.has_ui:
-            return
+        #if not self.engine.has_ui:
+        #    return
 
         # first, we use the special import_module command to access the app module
         # that resides inside the python folder in the app. This is where the actual UI
@@ -94,7 +94,9 @@ class ShotgunPanelApp(Application):
         # for the panel widget in the future. In that case, we'll need to
         # check here to see if the panel has been pinned by the user, and
         # if it has NOT navigate it to home.
-        if self.engine.has_ui and self._current_panel:
+        #if self.engine.has_ui and self._current_panel:
+        """
+        if self._current_panel:
             try:
                 self._current_panel.navigate_to_context(new_context)
             except RuntimeError:
@@ -102,6 +104,7 @@ class ShotgunPanelApp(Application):
                     "Current panel widget has been garbage collected, so"
                     "unable to navigate to the new context."
                 )
+        """
 
     def navigate(self, entity_type, entity_id, mode):
         """
@@ -208,7 +211,7 @@ class ShotgunPanelApp(Application):
         try:
             widget = self.engine.show_panel(
                 self._unique_panel_id,
-                "Flow Production Tracking Panel",
+                "FPT Panel",
                 self,
                 app_payload.AppDialog,
             )
@@ -223,6 +226,59 @@ class ShotgunPanelApp(Application):
         else:
             self._current_panel = widget
 
+        return widget
+
+    def create_panel_for_P4SG(self, parent):
+        """
+        Shows the UI as a panel.
+        Note that since panels are singletons by nature,
+        calling this more than once will only result in one panel.
+
+        :returns: The widget associated with the panel.
+        """
+        app_payload = self.import_module("app")
+
+        # start the UI
+        try:
+            widget = self.engine.show_panel(
+                self._unique_panel_id,
+                "FPT Panel",
+                parent,
+                app_payload.AppDialog,
+            )
+        except AttributeError as e:
+            # just to gracefully handle older engines and older cores
+            self.log_warning(
+                "Could not execute show_panel method - please upgrade "
+                "to latest core and engine! Falling back on show_dialog. "
+                "Error: %s" % e
+            )
+            widget = self.create_dialog_for_P4SG(parent)
+        else:
+            self._current_panel = widget
+
+        return widget
+
+
+    def create_dialog_for_P4SG(self, parent):
+        """
+        Shows the panel as a dialog.
+
+        Contrary to the create_panel() method, multiple calls
+        to this method will result in multiple windows appearing.
+
+        :returns: The widget associated with the dialog.
+        """
+        app_payload = self.import_module("app")
+        widget = self.engine.show_dialog("Panel", parent, app_payload.AppDialog)
+        self._current_dialog = widget
+        return widget
+
+    def create_widget_for_P4SG(self, parent):
+        widget = self.create_dialog_for_P4SG(parent)
+        #widget = self.create_dialog_for_P4SG(self)
+        #widget.hide()
+        #self._current_panel = widget
         return widget
 
     def create_dialog(self):
