@@ -106,6 +106,25 @@ class ShotgunPanelApp(Application):
                 )
         """
 
+    def determine_navigation_mode(self):
+        """
+        Determines the appropriate navigation mode based on the current application state
+        or user preferences. This is a placeholder for your logic to decide whether to
+        use PANEL, DIALOG, or NEW_DIALOG.
+
+        :returns: One of self.PANEL, self.DIALOG, or self.NEW_DIALOG
+        """
+        # Example decision logic:
+        # - Use PANEL if it exists and is not in use.
+        # - Use DIALOG if a dialog is already open but a panel isn't.
+        # - Default to NEW_DIALOG to always open a new dialog.
+        if self._current_panel and not self._current_panel.is_closed():
+            return self.PANEL
+        elif self._current_dialog and not self._current_dialog.is_closed():
+            return self.DIALOG
+        else:
+            return self.NEW_DIALOG
+
     def navigate(self, entity_type, entity_id, mode):
         """
         API support to start the panel and navigate to a location.
@@ -259,6 +278,16 @@ class ShotgunPanelApp(Application):
 
         return widget
 
+    def create_widget_for_P4SG(self, parent):
+        """
+        Creates the widget for embedding into an existing layout without opening a new window.
+        :param parent: The parent widget or layout.
+        :returns: The widget associated with the panel.
+        """
+        app_payload = self.import_module("app")
+        widget = app_payload.AppDialog(parent=parent)
+        self._current_panel = widget
+        return widget
 
     def create_dialog_for_P4SG(self, parent):
         """
@@ -274,12 +303,6 @@ class ShotgunPanelApp(Application):
         self._current_dialog = widget
         return widget
 
-    def create_widget_for_P4SG(self, parent):
-        widget = self.create_dialog_for_P4SG(parent)
-        #widget = self.create_dialog_for_P4SG(self)
-        #widget.hide()
-        #self._current_panel = widget
-        return widget
 
     def create_dialog(self):
         """
