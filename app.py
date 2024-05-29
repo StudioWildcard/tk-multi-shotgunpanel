@@ -278,7 +278,7 @@ class ShotgunPanelApp(Application):
 
         return widget
 
-    def create_widget_for_P4SG(self, parent):
+    def create_widget_for_P4SG_original(self, parent):
         """
         Creates the widget for embedding into an existing layout without opening a new window.
         :param parent: The parent widget or layout.
@@ -286,6 +286,23 @@ class ShotgunPanelApp(Application):
         """
         app_payload = self.import_module("app")
         widget = app_payload.AppDialog(parent=parent)
+        self._current_panel = widget
+        return widget
+
+    def create_widget_for_P4SG(self, parent):
+        """
+        Creates the widget for embedding into an existing layout without opening a new window.
+        :param parent: The parent widget or layout.
+        :returns: The widget associated with the panel.
+        """
+        from sgtk.platform.qt import QtGui
+        app_payload = self.import_module("app")
+        widget = app_payload.AppDialog(parent=parent)
+
+        # Set the size policy to make the widget resizable
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        widget.setSizePolicy(sizePolicy)
+
         self._current_panel = widget
         return widget
 
