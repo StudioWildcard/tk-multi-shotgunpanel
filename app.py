@@ -230,7 +230,7 @@ class ShotgunPanelApp(Application):
         try:
             widget = self.engine.show_panel(
                 self._unique_panel_id,
-                "FPT Panel",
+                "Flow Production Tracking Panel",
                 self,
                 app_payload.AppDialog,
             )

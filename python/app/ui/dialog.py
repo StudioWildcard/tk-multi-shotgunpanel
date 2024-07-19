@@ -9,7 +9,6 @@
 
 from sgtk.platform.qt import QtCore, QtGui
 
-
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
@@ -114,7 +113,6 @@ class Ui_Dialog(object):
         self.details_text_header.setWordWrap(False)
         self.details_text_header.setObjectName("details_text_header")
         self.horizontalLayout.addWidget(self.details_text_header)
-
         self.refresh_button = QtGui.QToolButton(self.page)
         self.refresh_button.setMinimumSize(QtCore.QSize(30, 30))
         self.refresh_button.setMaximumSize(QtCore.QSize(30, 30))
@@ -122,7 +120,6 @@ class Ui_Dialog(object):
         self.refresh_button.setText("")
         self.refresh_button.setObjectName("refresh_button")
         self.horizontalLayout.addWidget(self.refresh_button)
-
         self.set_context = WorkAreaButton(self.page)
         self.set_context.setMinimumSize(QtCore.QSize(30, 30))
         self.set_context.setMaximumSize(QtCore.QSize(30, 30))
@@ -299,25 +296,15 @@ class Ui_Dialog(object):
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(QtGui.QApplication.translate("Dialog", "Flow Production Tracking Browser", None,
-                                                           QtGui.QApplication.UnicodeUTF8))
-        self.navigation_home.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go to your work area", None,
-                                                                     QtGui.QApplication.UnicodeUTF8))
-        self.navigation_prev.setToolTip(
-            QtGui.QApplication.translate("Dialog", "Click to go back", None, QtGui.QApplication.UnicodeUTF8))
-        self.navigation_next.setToolTip(
-            QtGui.QApplication.translate("Dialog", "Click to go forward", None, QtGui.QApplication.UnicodeUTF8))
-        self.details_text_header.setText(
-            QtGui.QApplication.translate("Dialog", "Header Text", None, QtGui.QApplication.UnicodeUTF8))
-        self.set_context.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go to your work area", None,
-                                                                 QtGui.QApplication.UnicodeUTF8))
-        self.search.setToolTip(QtGui.QApplication.translate("Dialog", "Search Flow Production Tracking", None,
-                                                            QtGui.QApplication.UnicodeUTF8))
-        self.cancel_search.setText(
-            QtGui.QApplication.translate("Dialog", "Cancel", None, QtGui.QApplication.UnicodeUTF8))
-        self.details_text_middle.setText(
-            QtGui.QApplication.translate("Dialog", "Details Text", None, QtGui.QApplication.UnicodeUTF8))
-
+        Dialog.setWindowTitle(QtGui.QApplication.translate("Dialog", "Flow Production Tracking Browser", None, QtGui.QApplication.UnicodeUTF8))
+        self.navigation_home.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go to your work area", None, QtGui.QApplication.UnicodeUTF8))
+        self.navigation_prev.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go back", None, QtGui.QApplication.UnicodeUTF8))
+        self.navigation_next.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go forward", None, QtGui.QApplication.UnicodeUTF8))
+        self.details_text_header.setText(QtGui.QApplication.translate("Dialog", "Header Text", None, QtGui.QApplication.UnicodeUTF8))
+        self.set_context.setToolTip(QtGui.QApplication.translate("Dialog", "Click to go to your work area", None, QtGui.QApplication.UnicodeUTF8))
+        self.search.setToolTip(QtGui.QApplication.translate("Dialog", "Search Flow Production Tracking", None, QtGui.QApplication.UnicodeUTF8))
+        self.cancel_search.setText(QtGui.QApplication.translate("Dialog", "Cancel", None, QtGui.QApplication.UnicodeUTF8))
+        self.details_text_middle.setText(QtGui.QApplication.translate("Dialog", "Details Text", None, QtGui.QApplication.UnicodeUTF8))
 
 from ..qtwidgets import ShotgunPlaybackLabel, ReplyListWidget, GlobalSearchWidget
 from ..work_area_button import WorkAreaButton
