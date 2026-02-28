@@ -76,6 +76,7 @@ class ShotgunPanelApp(Application):
             },
         )
 
+
     @property
     def context_change_allowed(self):
         """
@@ -216,12 +217,15 @@ class ShotgunPanelApp(Application):
         """
         self.log_debug("Destroying app...")
 
-    def create_panel(self):
+    def create_panel(self, parent=None):
         """
         Shows the UI as a panel.
         Note that since panels are singletons by nature,
         calling this more than once will only result in one panel.
 
+        :param parent: Optional parent widget. Defaults to self (the app bundle)
+                       when used standalone; pass an explicit parent widget to
+                       embed inside another dialog.
         :returns: The widget associated with the panel.
         """
         app_payload = self.import_module("app")
@@ -230,8 +234,8 @@ class ShotgunPanelApp(Application):
         try:
             widget = self.engine.show_panel(
                 self._unique_panel_id,
-                "Flow Production Tracking Panel",
-                self,
+                "Panel",
+                parent or self,
                 app_payload.AppDialog,
             )
         except AttributeError as e:
@@ -241,58 +245,20 @@ class ShotgunPanelApp(Application):
                 "to latest core and engine! Falling back on show_dialog. "
                 "Error: %s" % e
             )
-            widget = self.create_dialog()
+            widget = self.create_dialog(parent=parent)
         else:
             self._current_panel = widget
 
         return widget
 
-    def create_panel_for_P4SG(self, parent):
+    def create_widget(self, parent):
         """
-        Shows the UI as a panel.
-        Note that since panels are singletons by nature,
-        calling this more than once will only result in one panel.
+        Creates the panel widget for embedding into an existing layout
+        without opening a new window. Unlike create_panel() and create_dialog(),
+        this directly instantiates the AppDialog widget so the caller can
+        manage layout.
 
-        :returns: The widget associated with the panel.
-        """
-        app_payload = self.import_module("app")
-
-        # start the UI
-        try:
-            widget = self.engine.show_panel(
-                self._unique_panel_id,
-                "FPT Panel",
-                parent,
-                app_payload.AppDialog,
-            )
-        except AttributeError as e:
-            # just to gracefully handle older engines and older cores
-            self.log_warning(
-                "Could not execute show_panel method - please upgrade "
-                "to latest core and engine! Falling back on show_dialog. "
-                "Error: %s" % e
-            )
-            widget = self.create_dialog_for_P4SG(parent)
-        else:
-            self._current_panel = widget
-
-        return widget
-
-    def create_widget_for_P4SG_original(self, parent):
-        """
-        Creates the widget for embedding into an existing layout without opening a new window.
-        :param parent: The parent widget or layout.
-        :returns: The widget associated with the panel.
-        """
-        app_payload = self.import_module("app")
-        widget = app_payload.AppDialog(parent=parent)
-        self._current_panel = widget
-        return widget
-
-    def create_widget_for_P4SG(self, parent):
-        """
-        Creates the widget for embedding into an existing layout without opening a new window.
-        :param parent: The parent widget or layout.
+        :param parent: The parent widget to embed the panel into.
         :returns: The widget associated with the panel.
         """
         from sgtk.platform.qt import QtGui
@@ -306,32 +272,20 @@ class ShotgunPanelApp(Application):
         self._current_panel = widget
         return widget
 
-    def create_dialog_for_P4SG(self, parent):
+    def create_dialog(self, parent=None):
         """
         Shows the panel as a dialog.
 
         Contrary to the create_panel() method, multiple calls
         to this method will result in multiple windows appearing.
 
+        :param parent: Optional parent widget. Defaults to self (the app bundle)
+                       when used standalone; pass an explicit parent widget to
+                       embed inside another dialog.
         :returns: The widget associated with the dialog.
         """
         app_payload = self.import_module("app")
-        widget = self.engine.show_dialog("Panel", parent, app_payload.AppDialog)
-        self._current_dialog = widget
-        return widget
-
-
-    def create_dialog(self):
-        """
-        Shows the panel as a dialog.
-
-        Contrary to the create_panel() method, multiple calls
-        to this method will result in multiple windows appearing.
-
-        :returns: The widget associated with the dialog.
-        """
-        app_payload = self.import_module("app")
-        widget = self.engine.show_dialog("Panel", self, app_payload.AppDialog)
+        widget = self.engine.show_dialog("Panel", parent or self, app_payload.AppDialog)
         self._current_dialog = widget
         return widget
 
