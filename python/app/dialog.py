@@ -150,6 +150,8 @@ class AppDialog(QtGui.QWidget):
         self.ui.refresh_button.setIcon(SGQIcon.refresh())
         self.ui.refresh_button.setToolTip("Click to refresh the current view.")
 
+        self.user_icon_orig = self.ui.current_user.icon()
+
         # create a note updater to run operations on notes in the db
         self._note_updater = NoteUpdater(self._task_manager, self)
 
@@ -233,6 +235,9 @@ class AppDialog(QtGui.QWidget):
         # The current visible tabs. This will change based on the current entity type
         self._current_entity_tabs = []
         self.ui.entity_tab_widget.currentChanged.connect(self._load_entity_tab_data)
+        self.ui.entity_tab_widget.currentChanged.connect(
+            self._update_preset_filters_on_tab_change
+        )
 
         # the set work area overlay
         self.ui.set_context.change_work_area.connect(self._change_work_area)
@@ -342,7 +347,7 @@ class AppDialog(QtGui.QWidget):
             self._current_entity_tabs = []
             formatter = self._current_location.sg_formatter
             for tab_name in self.ENTITY_TABS:
-                (enabled, text) = formatter.show_entity_tab(tab_name)
+                enabled, text = formatter.show_entity_tab(tab_name)
                 if enabled:
                     tab_widget = self._entity_tabs[tab_name]["widget"]
                     self.ui.entity_tab_widget.addTab(tab_widget, text)
@@ -372,6 +377,9 @@ class AppDialog(QtGui.QWidget):
         curr_index = self.ui.entity_tab_widget.currentIndex()
 
         if self._current_entity_tabs[curr_index] == self._current_location.tab:
+            # FIXME: SG-36564 It appears due to the changes above that we are unlikely to hit this point in the code.
+            #        Since the tabs are rebuilt each time the current index is
+            #        never going to match unless you are on the first tab.
             # we are already displaying the right tab
             # kick off a refresh
             self._load_entity_tab_data(curr_index)
@@ -492,6 +500,11 @@ class AppDialog(QtGui.QWidget):
                 else:
                     args = [self._current_location]
 
+                if tab.get("filter_menu", None):
+                    filters = tab["filter_menu"].get_active_preset_filter()
+                    filters = filters if filters else []
+                    kwargs["filters"] = filters
+
                 tab["model"].load_data(*args, **kwargs)
 
         else:
@@ -508,9 +521,13 @@ class AppDialog(QtGui.QWidget):
         Update the current user icon
         """
         curr_user_pixmap = self._current_user_model.get_pixmap()
+        if curr_user_pixmap:
+            icon = QtGui.QIcon(curr_user_pixmap)
+        else:
+            icon = self.user_icon_orig
 
         # QToolbutton needs a QIcon
-        self.ui.current_user.setIcon(QtGui.QIcon(curr_user_pixmap))
+        self.ui.current_user.setIcon(icon)
 
         # Update the reply icon
         sg_data = self._current_user_model.get_sg_data()
@@ -536,7 +553,7 @@ class AppDialog(QtGui.QWidget):
 
         # populate the text with data
         if sg_data:
-            (header, body) = formatter.format_entity_details(sg_data)
+            header, body = formatter.format_entity_details(sg_data)
             self.ui.details_text_header.setText(header)
             self.ui.details_text_header.setToolTip(header)
 
@@ -627,7 +644,7 @@ class AppDialog(QtGui.QWidget):
 
         if url.startswith("sgtk:"):
             # this is an internal url on the form sgtk:EntityType:entity_id
-            (_, entity_type, entity_id) = url.split(":")
+            _, entity_type, entity_id = url.split(":")
             entity_id = int(entity_id)
             self.navigate_to_entity(entity_type, entity_id)
 
@@ -878,13 +895,52 @@ class AppDialog(QtGui.QWidget):
                         "Creating new task:\n%s" % pprint.pprint(sg_data)
                     )
                     task_data = self._app.shotgun.create("Task", sg_data)
-                    (entity_type, entity_id) = (task_data["type"], task_data["id"])
+                    entity_type, entity_id = (task_data["type"], task_data["id"])
 
                 else:
                     # user selected a task in the UI
-                    (entity_type, entity_id) = dialog.selected_entity
+                    entity_type, entity_id = dialog.selected_entity
 
                 self._do_work_area_switch(entity_type, entity_id)
+
+    def _update_preset_filters_on_tab_change(self, index):
+        """
+        Update the preset filters for the given tab when the tab is changed.
+        :param index: index of the tab
+        """
+        tab_name = self._current_entity_tabs[index]
+        tab = self._entity_tabs.get(tab_name, None)
+        if not tab:
+            return
+
+        filter_menu = tab.get("filter_menu", None)
+        if not filter_menu:
+            return
+
+        # This prevents any potential filter changes caused by the hook creating a non-deterministic result
+        # from triggering a data load
+        restore_state = filter_menu.blockSignals(True)
+        try:
+            self._update_preset_filters(tab_name, tab, filter_menu)
+        finally:
+            filter_menu.blockSignals(restore_state)
+
+    def _update_preset_filters(self, tab_name, tab, filter_menu):
+        """
+        Update the preset filters for the given tab.
+        :param tab_name: str
+        :param tab: dict
+        :param filter_menu: ShotgunFilterMenu
+        """
+        preset_filters = self._app.execute_hook_method(
+            "shotgun_filters_hook",
+            "get_preset_filters",
+            tab_name=tab_name,
+            entity_type=tab.get("entity_type"),
+            sg_location=self._current_location,
+        )
+        if isinstance(preset_filters, dict):
+            filter_menu.set_preset_filters(preset_filters)
 
     def build_entity_tabs(self):
         """
@@ -923,6 +979,7 @@ class AppDialog(QtGui.QWidget):
                 "has_description": True,
                 "has_view": True,
                 "has_filter": False,
+                "tab_name": entity_tab_name,
             }
 
             if entity_tab_name == self.ENTITY_TAB_NOTES:
@@ -1053,6 +1110,11 @@ class AppDialog(QtGui.QWidget):
                     filter_menu = ShotgunFilterMenu(
                         data.get("view"), bg_task_manager=self._task_manager
                     )
+                    self._update_preset_filters(entity_tab_name, data, filter_menu)
+
+                    filter_menu.preset_filter_changed.connect(
+                        self._on_preset_filter_change
+                    )
                     filter_menu.set_visible_fields(data.get("filter_fields"))
                     filter_menu.set_filter_model(proxy_model)
 
@@ -1140,13 +1202,11 @@ class AppDialog(QtGui.QWidget):
         label.setAlignment(
             QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter
         )
-        label.setStyleSheet(
-            """
+        label.setStyleSheet("""
             font-size: 10px;
             font-weight: 100;
             font-style: italic;
-            """
-        )
+            """)
         return label
 
     def create_entity_tab_view(self, name, parent):
@@ -1294,7 +1354,7 @@ class AppDialog(QtGui.QWidget):
         )
         fields_manager.initialized.connect(self._field_filters)
         fields_manager.initialize()
-        self._sort_menu_actions()
+        self._sort_menu_actions(task_tab_data["tab_name"])
 
     def _field_filters(self):
 
@@ -1317,35 +1377,37 @@ class AppDialog(QtGui.QWidget):
         self._entity_field_menu.set_checked_filter(checked_filter)
         self._entity_field_menu.set_disabled_filter(disabled_filter)
 
-    def _sort_menu_actions(self):
+    def _on_preset_filter_change(self):
+        """
+        Callback when a preset filter is selected in the filter menu.
+        """
+        # Since the preset filters are processed with the server request for the data we need to refresh the data.
+        self.refresh(None)
+
+    def _sort_menu_actions(self, tab_name):
         """
         Populate the sort menu with actions.
         """
+
+        sort_fields = self._app.get_setting("sort_fields").get(tab_name, [])
 
         # Create Sort Menu actions
         sort_asc = self._entity_field_menu._get_qaction("ascending", "Ascending")
         sort_desc = self._entity_field_menu._get_qaction("descending", "Descending")
         separator = self._entity_field_menu.addSeparator()
-        status_action = self._entity_field_menu._get_qaction("sg_status_list", "Status")
-        step_action = self._entity_field_menu._get_qaction("step", "Step")
-        start_date_action = self._entity_field_menu._get_qaction(
-            "start_date", "Start date"
-        )
-        due_date_action = self._entity_field_menu._get_qaction("due_date", "Due date")
-
-        # Actions group list ordered
-        sort_actions = [
-            due_date_action,
-            start_date_action,
-            status_action,
-            separator,
-            sort_asc,
-            sort_desc,
+        field_sort_actions = [
+            self._entity_field_menu._get_qaction(
+                field["field_code"], field["display_name"]
+            )
+            for field in sort_fields or []
         ]
 
-        # By default it sort Tasks due date in descending order
+        # Actions group list ordered
+        sort_actions = [sort_asc, sort_desc, separator, *field_sort_actions]
+
+        # By default it sorts in descending order and the default field is set in the configuration
         sort_desc.setChecked(True)
-        due_date_action.setChecked(True)
+
         # Menu sort order actions
         sort_asc.triggered[()].connect(
             lambda: self.load_sort_data(
@@ -1357,19 +1419,29 @@ class AppDialog(QtGui.QWidget):
                 "descending", sort_desc, sort_actions, sort_order="desc"
             )
         )
+
         # Menu sort field actions
-        status_action.triggered[()].connect(
-            lambda: self.load_sort_data("sg_status_list", status_action, sort_actions)
-        )
-        step_action.triggered[()].connect(
-            lambda: self.load_sort_data("step", step_action, sort_actions)
-        )
-        start_date_action.triggered[()].connect(
-            lambda: self.load_sort_data("start_date", start_date_action, sort_actions)
-        )
-        due_date_action.triggered[()].connect(
-            lambda: self.load_sort_data("due_date", due_date_action, sort_actions)
-        )
+        default_set = False
+        for index, field_sort_action in enumerate(field_sort_actions):
+            sort_field = sort_fields[index]
+            field_code = sort_field["field_code"]
+
+            is_default = sort_field.get("default", False)
+            if is_default:
+                default_set = True
+                field_sort_action.setChecked(True)
+                self._current_menu_sort_item = field_code
+
+            field_sort_action.triggered[()].connect(
+                lambda fc=field_code, fsa=field_sort_action: self.load_sort_data(
+                    fc, fsa, sort_actions
+                )
+            )
+
+        if not default_set and sort_fields:
+            field_sort_actions[0].setChecked(True)
+            self._current_menu_sort_item = sort_fields[0]["field_code"]
+
         # Add actions to the entity Menu
         self._entity_field_menu.add_group(sort_actions, "Sort menu")
         # Remove the separator from the list
@@ -1426,11 +1498,11 @@ class AppDialog(QtGui.QWidget):
 
         # Set checked the current sort order in the Menu
         if sort_order == "asc":
-            actions_list[3].setChecked(True)
-            actions_list[4].setChecked(False)
+            actions_list[0].setChecked(True)
+            actions_list[1].setChecked(False)
         elif sort_order == "desc":
-            actions_list[4].setChecked(True)
-            actions_list[3].setChecked(False)
+            actions_list[0].setChecked(False)
+            actions_list[1].setChecked(True)
 
         # Save the last menu item selected
         self._current_menu_sort_item = field
